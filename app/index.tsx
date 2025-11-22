@@ -6,7 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore
 import { soundAssets } from '../assets';
 
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation } from 'expo-router';
+
 export default function HomeScreen() {
+  const navigation = useNavigation();
   const playerRef = useRef<AudioPlayer | null>(null);
   const insets = useSafeAreaInsets();
   // Initialize all sections as expanded (false = expanded in this logic, or we can flip it)
@@ -82,7 +86,7 @@ export default function HomeScreen() {
       <View style={styles.contentContainer}>
         {/* Main Header */}
         <View style={[styles.mainHeader, { paddingTop: insets.top + 10 }]}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
             <MaterialIcons name="menu" size={28} color="#fff" />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
