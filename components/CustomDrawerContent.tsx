@@ -4,8 +4,14 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useGlobalSearchParams } from 'expo-router';
+
 export default function CustomDrawerContent(props: any) {
     const insets = useSafeAreaInsets();
+    const { category } = useGlobalSearchParams<{ category: string }>();
+
+    // Default to 'all' if no category is present
+    const currentCategory = category || 'all';
 
     return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -30,26 +36,33 @@ export default function CustomDrawerContent(props: any) {
                         onPress={() => { }}
                         labelStyle={styles.label}
                     />
-                    <View style={styles.selectedItem}>
+
+                    <View style={currentCategory === 'all' ? styles.selectedItem : null}>
                         <DrawerItem
                             label="Alle Geluiden"
-                            icon={({ color, size }) => <MaterialIcons name="library-music" size={size} color="#E91E63" />}
-                            onPress={() => { }}
-                            labelStyle={[styles.label, { color: '#E91E63' }]}
+                            icon={({ color, size }) => <MaterialIcons name="library-music" size={size} color={currentCategory === 'all' ? "#E91E63" : "#757575"} />}
+                            onPress={() => props.navigation.navigate('index', { category: 'all' })}
+                            labelStyle={[styles.label, currentCategory === 'all' && { color: '#E91E63' }]}
                         />
                     </View>
-                    <DrawerItem
-                        label="Kud"
-                        icon={({ color, size }) => <MaterialIcons name="library-music" size={size} color="#757575" />}
-                        onPress={() => { }}
-                        labelStyle={styles.label}
-                    />
-                    <DrawerItem
-                        label="Lekker Spelen"
-                        icon={({ color, size }) => <MaterialIcons name="library-music" size={size} color="#757575" />}
-                        onPress={() => { }}
-                        labelStyle={styles.label}
-                    />
+
+                    <View style={currentCategory === 'kud' ? styles.selectedItem : null}>
+                        <DrawerItem
+                            label="Kud"
+                            icon={({ color, size }) => <MaterialIcons name="library-music" size={size} color={currentCategory === 'kud' ? "#E91E63" : "#757575"} />}
+                            onPress={() => props.navigation.navigate('index', { category: 'kud' })}
+                            labelStyle={[styles.label, currentCategory === 'kud' && { color: '#E91E63' }]}
+                        />
+                    </View>
+
+                    <View style={currentCategory === 'lekker_spelen' ? styles.selectedItem : null}>
+                        <DrawerItem
+                            label="Lekker Spelen"
+                            icon={({ color, size }) => <MaterialIcons name="library-music" size={size} color={currentCategory === 'lekker_spelen' ? "#E91E63" : "#757575"} />}
+                            onPress={() => props.navigation.navigate('index', { category: 'lekker_spelen' })}
+                            labelStyle={[styles.label, currentCategory === 'lekker_spelen' && { color: '#E91E63' }]}
+                        />
+                    </View>
 
                     <View style={styles.divider} />
 

@@ -7,15 +7,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { soundAssets } from '../assets';
 
 import { DrawerActions } from '@react-navigation/native';
-import { useNavigation } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { category } = useLocalSearchParams<{ category: string }>();
   const playerRef = useRef<AudioPlayer | null>(null);
   const insets = useSafeAreaInsets();
   // Initialize all sections as expanded (false = expanded in this logic, or we can flip it)
   // Let's stick to: true = collapsed, false/undefined = expanded
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  const filteredAssets = React.useMemo(() => {
+    if (!category || category === 'all') return soundAssets;
+    return soundAssets.filter((section: any) => section.category === category);
+  }, [category]);
+
+  const getSubtitle = () => {
+    if (category === 'kud') return 'Kud';
+    if (category === 'lekker_spelen') return 'Lekker Spelen';
+    return 'Alle Geluiden';
+  };
 
   function playSound(source: any) {
     if (playerRef.current) {
@@ -91,7 +103,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.appTitle}>Malse Geluiden</Text>
-            <Text style={styles.appSubtitle}>Alle Geluiden</Text>
+            <Text style={styles.appSubtitle}>{getSubtitle()}</Text>
           </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity style={{ marginRight: 15 }}>
@@ -104,7 +116,7 @@ export default function HomeScreen() {
         </View>
 
         <SectionList
-          sections={soundAssets}
+          sections={filteredAssets}
           keyExtractor={(item, index) => item.name + index}
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
