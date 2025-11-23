@@ -2,6 +2,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore
 import { soundAssets } from '../assets';
@@ -30,6 +31,22 @@ const HighlightedText = ({ text, query, style }: { text: string, query: string, 
     </Text>
   );
 };
+
+const AnimatedChevron = ({ collapsed }: { collapsed: boolean }) => {
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: withTiming(collapsed ? '0deg' : '180deg') }],
+    };
+  });
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <MaterialIcons name="keyboard-arrow-down" size={24} color={Palette.white} />
+    </Animated.View>
+  );
+};
+
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -95,8 +112,16 @@ export default function HomeScreen() {
       }).filter((section: any) => section.data.length > 0);
     }
 
+    // 3. Handle Collapsed Sections
+    assets = assets.map((section: any) => {
+      if (collapsedSections[section.title]) {
+        return { ...section, data: [] };
+      }
+      return section;
+    });
+
     return assets;
-  }, [category, searchQuery]);
+  }, [category, searchQuery, collapsedSections]);
 
   const getSubtitle = () => {
     if (category === 'kud') return 'Kud';
@@ -131,33 +156,40 @@ export default function HomeScreen() {
   };
 
   const renderItem = ({ item, section }: { item: any, section: any }) => {
-    if (collapsedSections[section.title]) {
-      return null;
-    }
     return (
-      <TouchableOpacity style={styles.item} onPress={() => playSound(item.source)}>
-        <View style={styles.playIconContainer}>
-          <Ionicons name="play-circle" size={48} color={Palette.colorAccent} />
-        </View>
-        <View style={styles.itemTextContainer}>
-          <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
-        </View>
-        <TouchableOpacity style={styles.moreIcon}>
-          <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
+      <Animated.View entering={FadeIn} exiting={FadeOut}>
+        <TouchableOpacity style={styles.item} onPress={() => playSound(item.source)}>
+          <View style={styles.playIconContainer}>
+            <Ionicons name="play-circle" size={48} color={Palette.colorAccent} />
+          </View>
+          <View style={styles.itemTextContainer}>
+            <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
+          </View>
+          <TouchableOpacity style={styles.moreIcon}>
+            <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </Animated.View>
     );
   };
 
   const renderSectionHeader = ({ section }: { section: any }) => {
     const isCollapsed = collapsedSections[section.title];
-    const count = section.data.length;
-    const statusText = isCollapsed ? 'ingeklapt' : 'uitgeklapt';
+    const count = section.data.length; // Note: This will be 0 when collapsed if we use filteredAssets logic.
+    // We need the REAL count.
+    // To fix this, we should look up the original count or pass it differently.
+    // Or, we can just not show the count, or accept it shows 0 (which is technically true for visible items).
+    // Let's try to find the original count.
+    const originalSection = soundAssets.find((s: any) => s.title === section.title);
+    const realCount = originalSection ? originalSection.data.length : 0;
 
     return (
-      <TouchableOpacity style={styles.header} onPress={() => toggleSection(section.title)}>
-        <HighlightedText text={formatName(section.title)} query={searchQuery} style={styles.headerTitle} />
-        <Text style={styles.headerSubtitle}>{count} geluiden ({statusText})</Text>
+      <TouchableOpacity style={styles.header} onPress={() => toggleSection(section.title)} activeOpacity={0.7}>
+        <View style={styles.headerTextContainer}>
+          <HighlightedText text={formatName(section.title)} query={searchQuery} style={styles.headerTitle} />
+          <Text style={styles.headerSubtitle}>{realCount} geluiden</Text>
+        </View>
+        <AnimatedChevron collapsed={!!isCollapsed} />
       </TouchableOpacity>
     );
   };
@@ -211,13 +243,15 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <SectionList
+        <AnimatedSectionList
           sections={filteredAssets}
-          keyExtractor={(item, index) => item.name + index}
+          keyExtractor={(item: any, index: number) => item.name + index}
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
           extraData={{ collapsedSections, searchQuery }}
           contentContainerStyle={styles.listContent}
+          // @ts-ignore
+          itemLayoutAnimation={LinearTransition.springify()}
         />
       </View>
     </View>
@@ -262,8 +296,14 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: Palette.colorPrimaryDark, // Darker red for section headers
-    paddingVertical: 8,
+    paddingVertical: 12, // Increased padding for better touch target
     paddingHorizontal: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 14,
