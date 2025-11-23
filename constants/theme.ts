@@ -17,8 +17,9 @@ export const Palette = {
   textPrimaryLight: '#F8BBD0',
   textPrimary: '#212121',
   textSecondary: '#757575',
-  listChoiceNormalBgLight: '#fafafa',
-  listChoicePressedBgLight: '#ffdddd',
+  listChoiceNormalBgLight: '#FFFFFF',
+  listChoiceSelectedBgLight: '#E0E0E0',
+  shareColor: '#8BC34A',
   icons: '#FFFFFF',
   divider: '#BDBDBD',
 };

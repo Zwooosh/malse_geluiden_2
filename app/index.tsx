@@ -1,7 +1,10 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Asset } from 'expo-asset';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
+import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Animated as RNAnimated, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore
@@ -172,25 +175,78 @@ export default function HomeScreen() {
     }));
   };
 
+  const renderRightActions = (progress: any, dragX: any) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View style={styles.rightAction}>
+        <RNAnimated.View style={{ transform: [{ scale }] }}>
+          <MaterialIcons name="share" size={30} color={Palette.white} />
+        </RNAnimated.View>
+      </View>
+    );
+  };
+
   const renderItem = ({ item, section }: { item: any, section: any }) => {
     const isPlaying = playingSoundName === item.name;
+    let swipeableRef: Swipeable | null = null;
+
+    const handleSwipeOpen = async () => {
+      // Close immediately to reset state
+      swipeableRef?.close();
+
+      try {
+        if (!(await Sharing.isAvailableAsync())) {
+          alert("Sharing is not available on this device");
+          return;
+        }
+        // We need to resolve the asset to a file URI
+        // Assuming item.source is a require() result
+        const asset = Asset.fromModule(item.source);
+        await asset.downloadAsync(); // Ensure it's available locally
+
+        await Sharing.shareAsync(asset.localUri || asset.uri || '', {
+          mimeType: 'audio/mpeg', // Or guess from filename
+          dialogTitle: `Share ${formatName(item.name)}`,
+        });
+      } catch (error) {
+        console.error("Error sharing sound:", error);
+        alert("Failed to share sound.");
+      }
+    };
+
     return (
       <Animated.View entering={FadeIn} exiting={FadeOut}>
-        <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
-          <View style={styles.playIconContainer}>
-            <Ionicons
-              name={isPlaying ? "stop-circle" : "play-circle"}
-              size={48}
-              color={Palette.colorAccent}
-            />
-          </View>
-          <View style={styles.itemTextContainer}>
-            <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
-          </View>
-          <TouchableOpacity style={styles.moreIcon}>
-            <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
+        <Swipeable
+          ref={(ref) => { swipeableRef = ref; }}
+          renderRightActions={renderRightActions}
+          onSwipeableOpen={(direction) => {
+            if (direction === 'right') {
+              handleSwipeOpen();
+            }
+          }}
+          overshootRight={false}
+        >
+          <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
+            <View style={styles.playIconContainer}>
+              <Ionicons
+                name={isPlaying ? "stop-circle" : "play-circle"}
+                size={48}
+                color={Palette.colorAccent}
+              />
+            </View>
+            <View style={styles.itemTextContainer}>
+              <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
+            </View>
+            <TouchableOpacity style={styles.moreIcon}>
+              <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </Swipeable>
       </Animated.View>
     );
   };
@@ -369,5 +425,11 @@ const styles = StyleSheet.create({
     marginLeft: 15,
     marginRight: 15,
   },
+  rightAction: {
+    backgroundColor: Palette.shareColor,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    flex: 1,
+  },
 });
-
