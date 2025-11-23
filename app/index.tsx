@@ -1,16 +1,13 @@
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Asset } from 'expo-asset';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
-import * as Haptics from 'expo-haptics';
-import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Animated as RNAnimated, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
-import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { BackHandler, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore
 import { soundAssets } from '../assets';
+import SoundListItem from '../components/SoundListItem';
 import { Palette } from '../constants/theme';
 
 import { DrawerActions } from '@react-navigation/native';
@@ -189,36 +186,53 @@ export default function HomeScreen() {
     return 'Alle Geluiden';
   };
 
-  function playSound(item: any) {
-    if (playingSoundName === item.name) {
+  // Use a ref to keep track of playing sound name without triggering re-renders of the callback
+  const playingSoundNameRef = useRef<string | null>(null);
+
+  // Sync ref with state
+  useEffect(() => {
+    playingSoundNameRef.current = playingSoundName;
+  }, [playingSoundName]);
+
+  const playSound = React.useCallback((item: any) => {
+    const currentPlayingName = playingSoundNameRef.current;
+
+    if (currentPlayingName === item.name) {
       // Stop currently playing sound
-      if (playerRef.current) {
-        playerRef.current.pause();
-        // Seek to 0 to reset? Or just pause. User said "stop", implying reset.
-        playerRef.current.seekTo(0);
-      }
-      setPlayingSoundName(null);
+      setPlayingSoundName(null); // Update UI immediately
+
+      // Defer audio cleanup
+      setTimeout(() => {
+        if (playerRef.current) {
+          playerRef.current.pause();
+          playerRef.current.seekTo(0);
+        }
+      }, 0);
       return;
     }
 
     // Play new sound
-    if (playerRef.current) {
-      playerRef.current.replace(item.source);
-      playerRef.current.play();
-    } else {
-      const player = createAudioPlayer(item.source);
-      player.play();
-      playerRef.current = player;
+    setPlayingSoundName(item.name); // Update UI immediately
 
-      // Add listener for playback status
-      player.addListener('playbackStatusUpdate', (status: any) => {
-        if (status.didJustFinish) {
-          setPlayingSoundName(null);
-        }
-      });
-    }
-    setPlayingSoundName(item.name);
-  }
+    // Defer audio playback to allow UI to update
+    setTimeout(() => {
+      if (playerRef.current) {
+        playerRef.current.replace(item.source);
+        playerRef.current.play();
+      } else {
+        const player = createAudioPlayer(item.source);
+        player.play();
+        playerRef.current = player;
+
+        // Add listener for playback status
+        player.addListener('playbackStatusUpdate', (status: any) => {
+          if (status.didJustFinish) {
+            setPlayingSoundName(null);
+          }
+        });
+      }
+    }, 0);
+  }, []); // Empty dependency array = stable function!
 
   useEffect(() => {
     return () => {
@@ -235,137 +249,23 @@ export default function HomeScreen() {
     }));
   };
 
-  const renderLeftActions = (progress: any, dragX: any) => {
-    const scale = dragX.interpolate({
-      inputRange: [0, 100],
-      outputRange: [0, 1],
-      extrapolate: 'clamp',
-    });
-
-    const isFavoritesView = category === 'favorites';
-
-    return (
-      <View style={[styles.leftAction, isFavoritesView && { backgroundColor: Palette.deleteColor }]}>
-        <RNAnimated.View style={{ transform: [{ scale }] }}>
-          <MaterialIcons name={isFavoritesView ? "delete" : "star"} size={30} color={Palette.white} />
-        </RNAnimated.View>
-      </View>
-    );
-  };
-
-  const renderRightActions = (progress: any, dragX: any) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    });
-
-    return (
-      <View style={styles.rightAction}>
-        <RNAnimated.View style={{ transform: [{ scale }] }}>
-          <MaterialIcons name="share" size={30} color={Palette.white} />
-        </RNAnimated.View>
-      </View>
-    );
-  };
-
-  const renderItem = ({ item, section }: { item: any, section: any }) => {
+  const renderItem = React.useCallback(({ item, section }: { item: any, section: any }) => {
     const isPlaying = playingSoundName === item.name;
     const isFavorite = favorites.includes(item.name);
     const isFavoritesView = category === 'favorites';
-    let swipeableRef: Swipeable | null = null;
-
-    const handleSwipeOpen = async (direction: 'left' | 'right') => {
-      swipeableRef?.close();
-
-      // Haptic feedback
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      if (direction === 'right') {
-        // Share
-        try {
-          if (!(await Sharing.isAvailableAsync())) {
-            alert("Sharing is not available on this device");
-            return;
-          }
-          const asset = Asset.fromModule(item.source);
-          await asset.downloadAsync();
-
-          await Sharing.shareAsync(asset.localUri || asset.uri || '', {
-            mimeType: 'audio/mpeg',
-            dialogTitle: `Share ${formatName(item.name)}`,
-          });
-        } catch (error) {
-          console.error("Error sharing sound:", error);
-          alert("Failed to share sound.");
-        }
-      } else {
-        // Left Action (Favorite or Delete)
-        if (isFavoritesView) {
-          // Remove from favorites with confirmation
-          Alert.alert(
-            "Verwijderen",
-            `Weet je zeker dat je "${formatName(item.name)}" uit je favorieten wilt verwijderen?`,
-            [
-              {
-                text: "Annuleren",
-                style: "cancel"
-              },
-              {
-                text: "Verwijderen",
-                style: "destructive",
-                onPress: () => toggleFavorite(item.name)
-              }
-            ]
-          );
-        } else {
-          // Add/Remove favorite
-          toggleFavorite(item.name);
-        }
-      }
-    };
 
     return (
-      <Animated.View entering={FadeIn} exiting={FadeOut}>
-        <Swipeable
-          ref={(ref) => { swipeableRef = ref; }}
-          renderRightActions={renderRightActions}
-          renderLeftActions={renderLeftActions}
-          onSwipeableOpen={(direction) => {
-            handleSwipeOpen(direction === 'right' ? 'right' : 'left');
-          }}
-          overshootRight={false}
-          overshootLeft={false}
-        >
-          <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
-            {/* Favorite Marker - Only show if NOT in favorites view (or maybe keep it? Screenshot doesn't show it in fav view) */}
-            {isFavorite && !isFavoritesView && (
-              <View style={styles.favoriteMarker}>
-                <MaterialIcons name="star" size={10} color={Palette.white} style={styles.favoriteIcon} />
-              </View>
-            )}
-
-            <View style={styles.playIconContainer}>
-              <Ionicons
-                name={isPlaying ? "stop-circle" : "play-circle"}
-                size={48}
-                color={Palette.colorAccent}
-              />
-            </View>
-            <View style={styles.itemTextContainer}>
-              <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
-              {isFavoritesView && item.episodeTitle && (
-                <Text style={styles.itemSubtitle}>{formatName(item.episodeTitle)}</Text>
-              )}
-            </View>
-            <TouchableOpacity style={styles.moreIcon}>
-              <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Swipeable>
-      </Animated.View>
+      <SoundListItem
+        item={item}
+        isPlaying={isPlaying}
+        isFavorite={isFavorite}
+        isFavoritesView={isFavoritesView}
+        searchQuery={searchQuery}
+        onPlay={playSound}
+        onToggleFavorite={toggleFavorite}
+      />
     );
-  };
+  }, [playingSoundName, favorites, category, searchQuery, playSound, toggleFavorite]);
 
   const renderSectionHeader = ({ section }: { section: any }) => {
     if (category === 'favorites') return null;
@@ -439,15 +339,13 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <AnimatedSectionList
+        <SectionList
           sections={filteredAssets}
-          keyExtractor={(item: any, index: number) => item.name + index}
+          keyExtractor={(item: any) => item.name}
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
-          extraData={{ collapsedSections, searchQuery }}
+          extraData={{ collapsedSections, searchQuery, playingSoundName, favorites }}
           contentContainerStyle={styles.listContent}
-          // @ts-ignore
-          itemLayoutAnimation={LinearTransition.springify()}
         />
       </View>
     </View>
