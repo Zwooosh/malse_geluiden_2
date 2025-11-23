@@ -57,6 +57,7 @@ export default function HomeScreen() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [playingSoundName, setPlayingSoundName] = useState<string | null>(null);
 
   // Handle Android Back Button
   useEffect(() => {
@@ -96,10 +97,6 @@ export default function HomeScreen() {
       assets = assets.map((section: any) => {
         const titleMatches = section.title.replace(/_/g, ' ').toLowerCase().includes(query);
 
-        // If title matches, return all items (or maybe still filter items? Let's show all for now if title matches)
-        // Actually, usually better to filter items even if title matches, unless user wants to see the whole album.
-        // Let's stick to: Show item if Item Name matches OR Section Title matches.
-
         const filteredData = section.data.filter((item: any) => {
           const nameMatches = item.name.replace(/_/g, ' ').toLowerCase().includes(query);
           return nameMatches || titleMatches;
@@ -129,15 +126,35 @@ export default function HomeScreen() {
     return 'Alle Geluiden';
   };
 
-  function playSound(source: any) {
+  function playSound(item: any) {
+    if (playingSoundName === item.name) {
+      // Stop currently playing sound
+      if (playerRef.current) {
+        playerRef.current.pause();
+        // Seek to 0 to reset? Or just pause. User said "stop", implying reset.
+        playerRef.current.seekTo(0);
+      }
+      setPlayingSoundName(null);
+      return;
+    }
+
+    // Play new sound
     if (playerRef.current) {
-      playerRef.current.replace(source);
+      playerRef.current.replace(item.source);
       playerRef.current.play();
     } else {
-      const player = createAudioPlayer(source);
+      const player = createAudioPlayer(item.source);
       player.play();
       playerRef.current = player;
+
+      // Add listener for playback status
+      player.addListener('playbackStatusUpdate', (status: any) => {
+        if (status.didJustFinish) {
+          setPlayingSoundName(null);
+        }
+      });
     }
+    setPlayingSoundName(item.name);
   }
 
   useEffect(() => {
@@ -156,11 +173,16 @@ export default function HomeScreen() {
   };
 
   const renderItem = ({ item, section }: { item: any, section: any }) => {
+    const isPlaying = playingSoundName === item.name;
     return (
       <Animated.View entering={FadeIn} exiting={FadeOut}>
-        <TouchableOpacity style={styles.item} onPress={() => playSound(item.source)}>
+        <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
           <View style={styles.playIconContainer}>
-            <Ionicons name="play-circle" size={48} color={Palette.colorAccent} />
+            <Ionicons
+              name={isPlaying ? "stop-circle" : "play-circle"}
+              size={48}
+              color={Palette.colorAccent}
+            />
           </View>
           <View style={styles.itemTextContainer}>
             <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
