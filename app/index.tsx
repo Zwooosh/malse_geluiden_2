@@ -5,6 +5,7 @@ import { BackHandler, SectionList, StatusBar, StyleSheet, Text, TextInput, Touch
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore
 import { soundAssets } from '../assets';
+import { Palette } from '../constants/theme';
 
 import { DrawerActions } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
@@ -21,7 +22,7 @@ const HighlightedText = ({ text, query, style }: { text: string, query: string, 
       {parts.map((part, index) => (
         <Text
           key={index}
-          style={part.toLowerCase() === query.toLowerCase() ? { backgroundColor: '#FFEB3B', color: '#000' } : {}}
+          style={part.toLowerCase() === query.toLowerCase() ? { backgroundColor: Palette.colorAccent, color: Palette.white } : {}}
         >
           {part}
         </Text>
@@ -136,13 +137,13 @@ export default function HomeScreen() {
     return (
       <TouchableOpacity style={styles.item} onPress={() => playSound(item.source)}>
         <View style={styles.playIconContainer}>
-          <Ionicons name="play-circle" size={48} color="#FF9800" />
+          <Ionicons name="play-circle" size={48} color={Palette.colorAccent} />
         </View>
         <View style={styles.itemTextContainer}>
           <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
         </View>
         <TouchableOpacity style={styles.moreIcon}>
-          <MaterialIcons name="more-vert" size={24} color="#FF9800" />
+          <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -171,26 +172,28 @@ export default function HomeScreen() {
           {isSearchVisible ? (
             <View style={styles.searchContainer}>
               <TouchableOpacity onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }}>
-                <MaterialIcons name="arrow-back" size={28} color="#fff" />
+                <MaterialIcons name="arrow-back" size={28} color={Palette.icons} />
               </TouchableOpacity>
               <TextInput
                 style={styles.searchInput}
                 placeholder="Zoek geluid..."
-                placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                placeholderTextColor={Palette.textPrimaryLight}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoFocus
+                cursorColor={Palette.white}
+                selectionColor={Palette.white}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <MaterialIcons name="close" size={24} color="#fff" />
+                  <MaterialIcons name="close" size={24} color={Palette.icons} />
                 </TouchableOpacity>
               )}
             </View>
           ) : (
             <>
               <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-                <MaterialIcons name="menu" size={28} color="#fff" />
+                <MaterialIcons name="menu" size={28} color={Palette.icons} />
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <Text style={styles.appTitle}>Malse Geluiden</Text>
@@ -198,10 +201,10 @@ export default function HomeScreen() {
               </View>
               <View style={styles.headerIcons}>
                 <TouchableOpacity style={{ marginRight: 15 }} onPress={() => setIsSearchVisible(true)}>
-                  <MaterialIcons name="search" size={28} color="#fff" />
+                  <MaterialIcons name="search" size={28} color={Palette.icons} />
                 </TouchableOpacity>
                 <TouchableOpacity>
-                  <MaterialIcons name="more-vert" size={28} color="#fff" />
+                  <MaterialIcons name="more-vert" size={28} color={Palette.icons} />
                 </TouchableOpacity>
               </View>
             </>
@@ -224,14 +227,14 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000', // Black background for the bottom bar area
+    backgroundColor: Palette.black, // Using extra dark for the system bar area background if visible
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: '#fff', // White background for the app content
+    backgroundColor: Palette.listChoiceNormalBgLight, // White background for the app content
   },
   mainHeader: {
-    backgroundColor: '#E91E63', // Pinkish red from screenshot
+    backgroundColor: Palette.colorPrimary, // Pinkish red from screenshot
     paddingHorizontal: 15,
     paddingBottom: 15,
     flexDirection: 'row',
@@ -245,11 +248,11 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: Palette.white,
   },
   appSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: Palette.textPrimaryLight,
   },
   headerIcons: {
     flexDirection: 'row',
@@ -258,25 +261,25 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
-    backgroundColor: '#B71C1C', // Darker red for section headers
+    backgroundColor: Palette.colorPrimaryDark, // Darker red for section headers
     paddingVertical: 8,
     paddingHorizontal: 15,
   },
   headerTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#fff',
+    color: Palette.white,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: Palette.textPrimaryLight,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 15,
-    backgroundColor: '#fff',
+    backgroundColor: Palette.listChoiceNormalBgLight,
     // No border in screenshot, but maybe needed for separation? Screenshot looks clean.
   },
   playIconContainer: {
@@ -287,7 +290,7 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 16,
-    color: '#333',
+    color: Palette.textPrimary,
   },
   moreIcon: {
     padding: 5,
@@ -299,11 +302,10 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: '#fff',
+    color: Palette.white,
     fontSize: 18,
     marginLeft: 15,
     marginRight: 15,
   },
 });
-
 

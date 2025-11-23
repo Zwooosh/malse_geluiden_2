@@ -5,17 +5,42 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
+export const Palette = {
+  transparent: '#00000000',
+  colorPrimary: '#e81c4f',
+  colorPrimaryDark: '#b1183f',
+  colorPrimaryExtraDark: '#700c25',
+  colorAccent: '#FFAB40',
+  colorAccentDark: '#FF6D00',
+  white: '#FFFFFF',
+  black: '#000000',
+  textPrimaryLight: '#F8BBD0',
+  textPrimary: '#212121',
+  textSecondary: '#757575',
+  listChoiceNormalBgLight: '#fafafa',
+  listChoicePressedBgLight: '#ffdddd',
+  icons: '#FFFFFF',
+  divider: '#BDBDBD',
+};
+
 const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: Palette.textPrimary,
+    background: Palette.white,
+    tint: Palette.colorPrimary,
+    icon: Palette.textSecondary,
+    tabIconDefault: Palette.textSecondary,
+    tabIconSelected: Palette.colorPrimary,
+    primary: Palette.colorPrimary,
+    primaryDark: Palette.colorPrimaryDark,
+    accent: Palette.colorAccent,
+    textSecondary: Palette.textSecondary,
+    divider: Palette.divider,
+    headerBackground: Palette.colorPrimary,
+    sectionHeaderBackground: Palette.colorPrimaryDark,
+    listBackground: Palette.listChoiceNormalBgLight,
   },
   dark: {
     text: '#ECEDEE',
