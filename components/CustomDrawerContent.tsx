@@ -31,12 +31,14 @@ export default function CustomDrawerContent(props: any) {
                 </View>
 
                 <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
-                    <DrawerItem
-                        label="Favorieten"
-                        icon={({ color, size }) => <MaterialIcons name="star" size={size} color={Palette.textSecondary} />}
-                        onPress={() => { }}
-                        labelStyle={styles.label}
-                    />
+                    <View style={currentCategory === 'favorites' ? styles.selectedItem : null}>
+                        <DrawerItem
+                            label="Favorieten"
+                            icon={({ color, size }) => <MaterialIcons name="star" size={size} color={currentCategory === 'favorites' ? Palette.colorPrimary : Palette.textSecondary} />}
+                            onPress={() => props.navigation.navigate('index', { category: 'favorites' })}
+                            labelStyle={[styles.label, currentCategory === 'favorites' && { color: Palette.colorPrimary }]}
+                        />
+                    </View>
 
                     <View style={currentCategory === 'all' ? styles.selectedItem : null}>
                         <DrawerItem
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
         marginLeft: -10,
     },
     selectedItem: {
-        backgroundColor: Palette.listChoicePressedBgLight, // Light pink selection background
+        backgroundColor: Palette.listChoiceSelectedBgLight, // Light pink selection background
     },
     divider: {
         height: 1,

@@ -20,6 +20,8 @@ export const Palette = {
   listChoiceNormalBgLight: '#FFFFFF',
   listChoiceSelectedBgLight: '#E0E0E0',
   shareColor: '#8BC34A',
+  favoriteColor: '#FF9800',
+  deleteColor: '#F44336',
   icons: '#FFFFFF',
   divider: '#BDBDBD',
 };

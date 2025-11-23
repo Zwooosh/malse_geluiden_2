@@ -1,9 +1,11 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Animated as RNAnimated, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, BackHandler, Animated as RNAnimated, SectionList, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -61,6 +63,38 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [playingSoundName, setPlayingSoundName] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  // Load favorites on mount
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  const loadFavorites = async () => {
+    try {
+      const storedFavorites = await AsyncStorage.getItem('favorites');
+      if (storedFavorites) {
+        setFavorites(JSON.parse(storedFavorites));
+      }
+    } catch (error) {
+      console.error("Failed to load favorites", error);
+    }
+  };
+
+  const toggleFavorite = async (name: string) => {
+    try {
+      let newFavorites = [...favorites];
+      if (newFavorites.includes(name)) {
+        newFavorites = newFavorites.filter(fav => fav !== name);
+      } else {
+        newFavorites.push(name);
+      }
+      setFavorites(newFavorites);
+      await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
+    } catch (error) {
+      console.error("Failed to toggle favorite", error);
+    }
+  };
 
   // Handle Android Back Button
   useEffect(() => {
@@ -90,6 +124,31 @@ export default function HomeScreen() {
     let assets = soundAssets;
 
     // 1. Filter by Category
+    if (category === 'favorites') {
+      // Flatten all assets and filter by favorites
+      const allItems = assets.flatMap((section: any) =>
+        section.data.map((item: any) => ({ ...item, episodeTitle: section.title }))
+      );
+
+      let favoriteItems = allItems.filter((item: any) => favorites.includes(item.name));
+
+      // Filter by Search Query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        favoriteItems = favoriteItems.filter((item: any) => {
+          const nameMatches = item.name.replace(/_/g, ' ').toLowerCase().includes(query);
+          const episodeMatches = item.episodeTitle ? item.episodeTitle.replace(/_/g, ' ').toLowerCase().includes(query) : false;
+          return nameMatches || episodeMatches;
+        });
+      }
+
+      // Sort alphabetically
+      favoriteItems.sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      // Return as a single section
+      return [{ title: 'Favorieten', data: favoriteItems }];
+    }
+
     if (category && category !== 'all') {
       assets = assets.filter((section: any) => section.category === category);
     }
@@ -121,11 +180,12 @@ export default function HomeScreen() {
     });
 
     return assets;
-  }, [category, searchQuery, collapsedSections]);
+  }, [category, searchQuery, collapsedSections, favorites]);
 
   const getSubtitle = () => {
     if (category === 'kud') return 'Kud';
     if (category === 'lekker_spelen') return 'Lekker Spelen';
+    if (category === 'favorites') return 'Favorieten';
     return 'Alle Geluiden';
   };
 
@@ -175,6 +235,24 @@ export default function HomeScreen() {
     }));
   };
 
+  const renderLeftActions = (progress: any, dragX: any) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 100],
+      outputRange: [0, 1],
+      extrapolate: 'clamp',
+    });
+
+    const isFavoritesView = category === 'favorites';
+
+    return (
+      <View style={[styles.leftAction, isFavoritesView && { backgroundColor: Palette.deleteColor }]}>
+        <RNAnimated.View style={{ transform: [{ scale }] }}>
+          <MaterialIcons name={isFavoritesView ? "delete" : "star"} size={30} color={Palette.white} />
+        </RNAnimated.View>
+      </View>
+    );
+  };
+
   const renderRightActions = (progress: any, dragX: any) => {
     const scale = dragX.interpolate({
       inputRange: [-100, 0],
@@ -193,29 +271,57 @@ export default function HomeScreen() {
 
   const renderItem = ({ item, section }: { item: any, section: any }) => {
     const isPlaying = playingSoundName === item.name;
+    const isFavorite = favorites.includes(item.name);
+    const isFavoritesView = category === 'favorites';
     let swipeableRef: Swipeable | null = null;
 
-    const handleSwipeOpen = async () => {
-      // Close immediately to reset state
+    const handleSwipeOpen = async (direction: 'left' | 'right') => {
       swipeableRef?.close();
 
-      try {
-        if (!(await Sharing.isAvailableAsync())) {
-          alert("Sharing is not available on this device");
-          return;
-        }
-        // We need to resolve the asset to a file URI
-        // Assuming item.source is a require() result
-        const asset = Asset.fromModule(item.source);
-        await asset.downloadAsync(); // Ensure it's available locally
+      // Haptic feedback
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        await Sharing.shareAsync(asset.localUri || asset.uri || '', {
-          mimeType: 'audio/mpeg', // Or guess from filename
-          dialogTitle: `Share ${formatName(item.name)}`,
-        });
-      } catch (error) {
-        console.error("Error sharing sound:", error);
-        alert("Failed to share sound.");
+      if (direction === 'right') {
+        // Share
+        try {
+          if (!(await Sharing.isAvailableAsync())) {
+            alert("Sharing is not available on this device");
+            return;
+          }
+          const asset = Asset.fromModule(item.source);
+          await asset.downloadAsync();
+
+          await Sharing.shareAsync(asset.localUri || asset.uri || '', {
+            mimeType: 'audio/mpeg',
+            dialogTitle: `Share ${formatName(item.name)}`,
+          });
+        } catch (error) {
+          console.error("Error sharing sound:", error);
+          alert("Failed to share sound.");
+        }
+      } else {
+        // Left Action (Favorite or Delete)
+        if (isFavoritesView) {
+          // Remove from favorites with confirmation
+          Alert.alert(
+            "Verwijderen",
+            `Weet je zeker dat je "${formatName(item.name)}" uit je favorieten wilt verwijderen?`,
+            [
+              {
+                text: "Annuleren",
+                style: "cancel"
+              },
+              {
+                text: "Verwijderen",
+                style: "destructive",
+                onPress: () => toggleFavorite(item.name)
+              }
+            ]
+          );
+        } else {
+          // Add/Remove favorite
+          toggleFavorite(item.name);
+        }
       }
     };
 
@@ -224,14 +330,21 @@ export default function HomeScreen() {
         <Swipeable
           ref={(ref) => { swipeableRef = ref; }}
           renderRightActions={renderRightActions}
+          renderLeftActions={renderLeftActions}
           onSwipeableOpen={(direction) => {
-            if (direction === 'right') {
-              handleSwipeOpen();
-            }
+            handleSwipeOpen(direction === 'right' ? 'right' : 'left');
           }}
           overshootRight={false}
+          overshootLeft={false}
         >
           <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
+            {/* Favorite Marker - Only show if NOT in favorites view (or maybe keep it? Screenshot doesn't show it in fav view) */}
+            {isFavorite && !isFavoritesView && (
+              <View style={styles.favoriteMarker}>
+                <MaterialIcons name="star" size={10} color={Palette.white} style={styles.favoriteIcon} />
+              </View>
+            )}
+
             <View style={styles.playIconContainer}>
               <Ionicons
                 name={isPlaying ? "stop-circle" : "play-circle"}
@@ -241,6 +354,9 @@ export default function HomeScreen() {
             </View>
             <View style={styles.itemTextContainer}>
               <HighlightedText text={formatName(item.name)} query={searchQuery} style={styles.itemTitle} />
+              {isFavoritesView && item.episodeTitle && (
+                <Text style={styles.itemSubtitle}>{formatName(item.episodeTitle)}</Text>
+              )}
             </View>
             <TouchableOpacity style={styles.moreIcon}>
               <MaterialIcons name="more-vert" size={24} color={Palette.colorAccent} />
@@ -252,6 +368,8 @@ export default function HomeScreen() {
   };
 
   const renderSectionHeader = ({ section }: { section: any }) => {
+    if (category === 'favorites') return null;
+
     const isCollapsed = collapsedSections[section.title];
     const count = section.data.length; // Note: This will be 0 when collapsed if we use filteredAssets logic.
     // We need the REAL count.
@@ -410,6 +528,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Palette.textPrimary,
   },
+  itemSubtitle: {
+    fontSize: 12,
+    color: Palette.textSecondary,
+    marginTop: 2,
+  },
   moreIcon: {
     padding: 5,
   },
@@ -432,4 +555,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flex: 1,
   },
+  leftAction: {
+    backgroundColor: Palette.favoriteColor,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    flex: 1,
+  },
+  favoriteMarker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderRightWidth: 24,
+    borderTopWidth: 24,
+    borderRightColor: 'transparent',
+    borderTopColor: Palette.favoriteColor,
+    zIndex: 10,
+  },
+  favoriteIcon: {
+    position: 'absolute',
+    top: -22, // Adjusted for the triangle
+    left: 2,
+  }
 });
